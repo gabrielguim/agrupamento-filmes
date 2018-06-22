@@ -48,6 +48,7 @@ plota_hclusts_2d = function(agrupamento,
     #' para as quantidades de grupos em `ks` usando `hclust`.
     library(ggplot2)
     library(dplyr, warn.conflicts = F)
+    library(plotly)
     
     atribuicoes = get_grupos(agrupamento, num_grupos = ks)
     
@@ -60,4 +61,28 @@ plota_hclusts_2d = function(agrupamento,
         geom_jitter(width = .02, height = 0, size = 1.6, alpha = .6) + 
         facet_wrap(~ paste(k, " grupos")) + 
         scale_color_brewer(palette = "Set2")
+}
+
+plotly_hclusts_2d = function(agrupamento,
+                            dados_filme,
+                            nome_colunas, # coluna usada para distâncias
+                            dist_method = "euclidean", 
+                            linkage_method = "complete",
+                            clusters = 5,
+                            ks = 1:9){
+    #' Retorna um ggplot das soluções de agrupamento de `dados_filme` 
+    #' para as quantidades de grupos em `ks` usando `hclust`.
+    library(ggplot2)
+    library(dplyr, warn.conflicts = F)
+    library(plotly)
+    
+    atribuicoes = get_grupos(agrupamento, num_grupos = ks)
+    
+    atribuicoes = atribuicoes %>% 
+        mutate(filme = label) %>% 
+        left_join(filmes, by = "filme")
+    
+    atribuicoes %>% filter(k == clusters) %>%
+        ggplot(aes_string(x = nome_colunas[1], y = nome_colunas[2], label = "filme", colour = "grupo")) + 
+        geom_jitter(width = .02, height = 0, size = 1.6, alpha = .6)
 }

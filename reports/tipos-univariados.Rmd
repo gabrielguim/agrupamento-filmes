@@ -1,9 +1,9 @@
 ---
-title: "Tipos de filme de FULANO(A)"
+title: "Os seis tipos filmes de Cate Blanchett"
 output:
     html_document:
-    df_print: paged
-theme: sandstone
+        code_folding: hide
+        theme: flatly
 ---
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
@@ -12,11 +12,12 @@ library(here)
 library(cluster)
 library(plotly)
 library(ggdendro)
+library(ggfortify)
 
 source(here::here("code/lib.R"))
 source(here("code/plota_solucoes_hclust.R"))
 
-theme_set(theme_report())
+theme_set(theme_light())
 
 knitr::opts_chunk$set(tidy = FALSE,
                       fig.width = 6,
@@ -30,126 +31,145 @@ paleta = c("#404E4D",
            "#F4743B")
 ```
 
-```{r}
-## ANTES DE USAR
-# Para criar data/movies.csv
-import_data("idris_elba")
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+import_data("cate_blanchett")
 ```
 
 
-```{r read}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 filmes = read_imported_data()
 ```
 
-## Descrição
+Para realizar a análise e agrupamento, faremos uso de dados extraídos do [Rotten Tomatoes](https://www.rottentomatoes.com).
 
-```{r}
-filmes %>% 
-    ggplot(aes(x = ano, y = bilheteria)) + 
-    geom_point(size = 4, color = paleta[1]) 
+O nosso objetivo é descobrir se existem _tipos_ diferentes de filmes que a __Cate Blanchett__ fez.
+
+# Dados
+
+No nosso conjunto de dados temos registros de 29 filmes feitos pela __Cate Blanchett__. Para cada filme possuímos as seguintes informações:
+
+```
+Avaliação: Variável numérica que descreve a avaliação feita pela crítica;
+
+Filme: Variávei textual que descreve o nome do filme;
+
+Papel: Variável textual que descreve o papel exercido pela atriz (o personagem);
+
+Bilheteria: Variável numérica que descreve a quantidade (em milhões de dólares) de  dinheiro arrecadado pelo filme;
+
+Ano: Variável textual que descreve o ano em que o filme foi lançado.
 ```
 
-
-
 ```{r}
-filmes %>% 
-    ggplot(aes(x = bilheteria)) + 
-    geom_histogram(binwidth = 15, fill = paleta[2], color = "black") + 
-    geom_rug(size = .5) 
+
+filmes %>% select(avaliacao, bilheteria, ano) %>% summary()
+
 ```
 
-```{r}
-filmes %>% 
-    ggplot(aes(x = avaliacao)) + 
-    geom_histogram(binwidth = 10, boundary = 0, fill = paleta[3], color = "black") + 
-    geom_rug(size = .5) 
+A partir da visualização acima podemos dizer que:
+
+```
+Avaliação: Varia de 30.00 a 95.00 e possui mediana 72.00 o que nos permite entender que os filmes que coletamos possuem uma avaliação boa;
+
+Bilheteria: Varia de 1.6 a 364.1 milhões de dólares e é aqui onde encontramos as maiores diferenças;
+
+Ano: Os filmes coletados foram lançados em anos entre 2000 e 2017.
 ```
 
-## Estrutura de grupos?
+# Visualizando graficamente as variáveis
+
+## Bilheteria 
 
 ```{r}
-p = filmes %>% 
+p <- filmes %>% 
     ggplot(aes(x = "", y = bilheteria, label = filme)) + 
     geom_jitter(width = .05, alpha = .3, size = 3) + 
-    labs(x = "")
+    geom_boxplot() +
+    labs(title = "Comportamento da variável 'Bilheteria'",
+         x = "",
+         y = "Bilheteria")
 
 ggplotly(p)
 ```
 
-## Agrupamento hierárquico
+Temos que realmente há uma diferença muito grande entre os filmes... É possível pereceber que mais da metade dos filmes possui bilheteria abaixo de 100 milhões de dólares e por outro lado, temos 6 de 29 filmes com bilheterias assustadoras em relação aos demais.
 
-```{r}
-agrupamento_h = filmes %>% 
-    mutate(nome = paste0(filme, " (av=", avaliacao, ")")) %>% 
-    as.data.frame() %>% 
-    column_to_rownames("filme") %>% 
-    select(avaliacao) %>%
-    dist(method = "euclidian") %>% 
-    hclust(method = "centroid")
-
-ggdendrogram(agrupamento_h, rotate = T, size = 2, theme_dendro = F) + 
-    labs(y = "Dissimilaridade", x = "", title = "Dendrograma")
-```
-
-```{r}
-get_grupos <- function(agrupamento, num_grupos){
-    agrupamento %>% 
-        cutree(num_grupos) %>% 
-        as.data.frame() %>% 
-        mutate(label = rownames(.)) %>% 
-        gather(key =  "k", value = "grupo", -label) %>% 
-        mutate(grupo = as.character(grupo))
-}
-
-atribuicoes = get_grupos(agrupamento_h, num_grupos = 1:6)
-
-atribuicoes = atribuicoes %>% 
-    left_join(filmes, by = c("label" = "filme"))
-
-atribuicoes %>% 
-    ggplot(aes(x = "Filmes", y = avaliacao, colour = grupo)) + 
-    geom_jitter(width = .02, height = 0, size = 1.6, alpha = .6) + 
-    facet_wrap(~ paste(k, " grupos")) + 
-    scale_color_brewer(palette = "Dark2")
-
-```
-
-```{r}
-k_escolhido = 4
-
-atribuicoes %>% 
-    filter(k == k_escolhido) %>% 
-    ggplot(aes(x = reorder(label, avaliacao), y = avaliacao, colour = grupo)) + 
-    geom_jitter(width = .02, height = 0, size = 3, alpha = .6) + 
-    facet_wrap(~ paste(k, " grupos")) + 
-    scale_color_brewer(palette = "Dark2") + 
-    labs(x = "", y = "Avaliação RT") + 
-    coord_flip() 
-```
+## Avaliação
 
 ```{r}
 p = filmes %>% 
+    ggplot(aes(x = "", y = avaliacao, label = filme)) + 
+    geom_jitter(width = .05, alpha = .3, size = 3) + 
+    geom_boxplot() +
+    labs(title = "Comportamento da variável 'Avaliação'",
+         x = "",
+         y = "Avaliação")
+
+ggplotly(p)
+```
+
+Nesse caso, temos um comportamento que podemos considerar mais comum, sem diferenças muito gritantes. Como visto acima, a maioria dos filmes realmente possuem uma avaliação relativamente boa.
+
+# Será que existe relação entre a Bilheteria e Avaliação? Quanto maior a nota maior a bilheteria?
+
+```{r}
+p <- filmes %>% 
     ggplot(aes(x = avaliacao, 
                y = bilheteria, 
                label = filme)) + 
-    geom_point() 
-p
+    geom_point() +
+    labs(title = "Gráfico 'Avaliação' x 'Bilheteria'",
+         x = "Avaliação",
+         y = "Bilheteria")
+
 ggplotly(p)
 ```
 
+Não conseguimos perceber facilmente uma relação entre as variáveis até porque nem sempre um filme bem avaliado é um __blockbuster__. 
 
-```{r}
+Mas observando um pouco mais a visualização podemos notar que existem "grupinhos" de filmes, como se tivessem um comportamento semelhante.
+
+# Quais são os "grupinhos"?
+
+Para verificar os grupos de filmes existentes iremos utilizar um algoritmo para agrupamento conhecido como hclust
+
+Antes de aplicar o algoritmo, iremos precisar saber em quantos grupos iremos dividir... Podemos fazer isso intuitivamente mas também podemos utilizar o __Dendrograma__, que nos auxilia a saber quais as divisões de grupos podem ser feitas.
+
+## Intuitivamente...
+
+Observando o __Gráfico Avaliação x Bilheteria__ quantos grupos você percebe?
+
+Eu consigo perceber 5 grupos:
+
+```
+Grupo 1: Os que são muito bem avaliados e muito bem recompensados.
+
+Grupo 2: Os que são muito bem avaliados mas pouco recompensados.
+
+Grupo 3: Os que possuem avaliação mediana (entre 50 e 80) e são pouco recompensados.
+
+Grupo 4: Os que possuem avaliação mediana (entre 50 e 80) mas são relativamente bem recompensados.
+
+Grupo 5: Os que nem são bem avaliados e nem bem recompensados.
+```
+
+## Sua intuição é boa? Faça o teste aqui ☜(˚▽˚)☜
+
+Para testar a nossa intuição iremos utilizar alguns gráficos abaixo que nos dará uma ideia de um número ideal de grupos baseado na melhoria que aquela forma de agrupamento tem.
+
+```{r message=FALSE, warning=FALSE}
 agrupamento_h_2d = filmes %>% 
-    as.data.frame() %>% 
+    mutate(bilheteria = log10(bilheteria)) %>%
+    mutate_at(vars("avaliacao", "bilheteria"), funs(scale)) %>%
     column_to_rownames("filme") %>%
-    select(avaliacao, bilheteria) %>%
+    select("avaliacao", "bilheteria") %>%
     dist(method = "euclidean") %>% 
-    hclust(method = "centroid")
+    hclust(method = "ward.D")
 
-ggdendrogram(agrupamento_h_2d, rotate = TRUE)
+ggdendrogram(agrupamento_h_2d, rotate = TRUE, theme_dendro = F)
 
 data.frame(height = agrupamento_h_2d$height) %>% 
-    mutate(k = 1:n()) %>% 
+    mutate(k = 1:n()) %>% filter(k <= 6) %>% 
     ggplot(aes(x = k, y = height)) + 
     geom_line(colour = "grey") + 
     geom_point() + 
@@ -157,58 +177,137 @@ data.frame(height = agrupamento_h_2d$height) %>%
 
 ```
 
-**Solução: standardize (aka scale).**
+Esse gráfico nos mostra que quando o número de clusters (grupos) passa de 4 para 5 há um aumento considerável no que o novo agrupamento agrega para a nossa análise, mas quando vemos a mudança de 5 para 6, não percebemos tanta diferença. Portanto, iremos escolher o ```k = 5``` porque aparentemente não temos grandes impactos.
+
+Ou seja, nossa intuição tá -quase- boa toda (⌐■_■)
 
 ```{r}
-agrupamento_h_2d = filmes %>% 
-    mutate_at(vars("avaliacao","bilheteria"), 
-              funs(scale)) %>% 
-    column_to_rownames("filme") %>%
-    select("avaliacao", "bilheteria") %>%
-    dist(method = "euclidean") %>% 
-    hclust(method = "centroid")
-
-ggdendrogram(agrupamento_h_2d, rotate = TRUE, theme_dendro = F)
-
-plota_hclusts_2d(agrupamento_h_2d, 
-                 filmes, 
-                 c("avaliacao", "bilheteria"), 
-                 linkage_method = "centroid", ks = 1:6) 
-
-```
-
-** Solução com Log **
-
-```{r}
-filmes %>% 
-    ggplot(aes(x = bilheteria)) + 
-    geom_histogram(bins = 30, fill = paleta[2], color = "black") +
-    scale_x_log10()
-```
-
-```{r}
-agrupamento_h_2d = filmes %>% 
-    mutate(bilheteria = log10(bilheteria)) %>%
-    mutate_at(vars("avaliacao", "bilheteria"), funs(scale)) %>%
-    column_to_rownames("filme") %>%
-    select("avaliacao", "bilheteria") %>%
-    dist(method = "euclidean") %>% 
-    hclust(method = "centroid")
-
-ggdendrogram(agrupamento_h_2d, rotate = TRUE, theme_dendro = F)
-
 filmes2 = filmes %>% mutate(bilheteria = log10(bilheteria))
-plota_hclusts_2d(agrupamento_h_2d, 
+p <- plotly_hclusts_2d(agrupamento_h_2d, 
                  filmes2, 
                  c("avaliacao", "bilheteria"), 
-                 linkage_method = "centroid", ks = 1:6) + 
-    scale_y_log10() + 
-    scale_color_brewer(palette = "Dark2")
+                 linkage_method = "ward.D",
+                 clusters = 5,
+                 ks = 1:6) + 
+    scale_color_brewer(palette = "Dark2") +
+    labs(title = "Agrupamento de filmes com 5 grupos",
+         x = "Avaliação",
+         y = "Bilheteria",
+         color = "Grupo")
+
+ggplotly(p)
+
 ```
+
+Seguindo as recomendações conseguimos a divisão que vemos acima... Particularmente eu não achei boa suficiente pra nos ajudar, porque é como se houvesse uma mistura no _grupo_ 5, como se os filmes com avaliação baixa se misturassem com alguns filmes de avaliação "mediana".
+
+Então vamos tentar ver como fica essa divisão para ```k = 6```
+
+```{r}
+p <- plotly_hclusts_2d(agrupamento_h_2d, 
+                 filmes2, 
+                 c("avaliacao", "bilheteria"), 
+                 linkage_method = "ward.D",
+                 clusters = 6,
+                 ks = 1:6) + 
+    scale_color_brewer(palette = "Dark2") +
+    labs(title = "Agrupamento de filmes com 6 grupos",
+         x = "Avaliação",
+         y = "Bilheteria",
+         color = "Grupo")
+
+ggplotly(p)
+```
+
+Agora eu me senti melhor... A mistura que havia no _cluster_ 4 foi desfeita e agora temos os filmes bons em avaliação e bilheteria separados dos filmes com bilheteria mediana. 
+
+Mas... Espera um pouco
+
+Essa divisão parece meio errada né? Calma que sei o que está confundindo... É como se na visualização a gente não percebesse as diferenças entre os clusters 3 e 4, justamente porque o eixo da bilheteria teve que escalar de alguma forma para caber a de __364.1M__, para melhorar a percepção vamos mudar a escala para _log_...
 
 ```{r}
 
+filmes2 = filmes %>% mutate(bilheteria = log10(bilheteria))
+p <- plotly_hclusts_2d(agrupamento_h_2d, 
+                 filmes2, 
+                 c("avaliacao", "bilheteria"), 
+                 linkage_method = "ward.D",
+                 clusters = 6,
+                 ks = 1:6) + 
+    scale_y_log10() + 
+    scale_color_brewer(palette = "Dark2") +
+    labs(title = "Agrupamento de filmes com 6 grupos e com escala log",
+         x = "Avaliação",
+         y = "Bilheteria",
+         color = "Grupo")
 
-
+ggplotly(p)
 ```
 
+Agora sim é possível perceber uma diferença grande entre os grupos em geral.
+
+__(•◡•)  PARA VER O NOME DO FILME, SUA BILHETERIA E AVALIAÇÃO BASTA PASSAR O MOUSE POR CIMA  (•◡•)__
+
+# Classificação
+
+Com ```k = 6``` podemos perceber a seguinte divisão na visualização acima:
+
+```
+Grupo 1: Iremos classificá-los como "Carol".
+
+Grupo 2: Iremos classificá-los como "Babel: Tudo misturado".
+
+Grupo 3: Iremos classificá-los como "Elizabeth: A Era não muito de Ouro".
+
+Grupo 4: Iremos classificá-los como "Senhor dos Anéis: A Sociedade do Sucesso".
+
+Grupo 5: Iremos classificá-los como "Não queria estar aqui".
+
+Grupo 6: Iremos classificá-los como "O Hobbit".
+```
+
+## Carol
+
+É um grupo de filmes que estão com uma __ótima__ avaliação mas não obtiveram uma boa bilheteria. O nome foi dado graças à sinopse do filme:
+
+```
+Em plena Nova Iorque dos anos 50, Carol Aird (__Cate Blanchett__) uma mulher elegante e de personalidade forte está passando por um difícil processo de divórcio com Harge Aird (Kyle Chandler) um típico empresário estadunidense. O casamento dos dois estava sendo sustentado para manter as aparências de uma sociedade exigente
+```
+
+Fazendo uma analogia, são os filmes com personalidade forte e que são bem vistos diante da crítica exigente.
+
+## Babel: Tudo misturado
+
+Representa um conjunto de filmes que estão no meio de tudo. Tem uma avaliação mediana e uma bilheteria também mediana. 
+
+```
+Um acidente reúne quatro grupos de pessoas de três continentes distintos: dois jovens marroquinos, um casal americano em férias, uma adolescente japonesa surda e seu pai e uma menina mexicana.
+```
+
+A escolha do nome do grupo foi feita graças ao trecho da sinopse do filme que diz que são pessoas de diferentes continentes, ou seja, o grupo se torna uma mistura de várias pessoas diferentes mas que são reunidas devido a alguns eventos em comum.
+
+## Elizabeth: A Era não muito de Ouro
+
+Elizabeth: A Era não muito de Ouro engloba os filmes que não foram bem avaliados...
+
+```
+Há quase três décadas no comando da Inglaterra, a Rainha Elizabeth I enfrenta ameaças ao seu poder, impostas por governos estrangeiros e pelo seu próprio país. Simultaneamente, o Rei da Espanha Felipe II, apoiado pelo Vaticano, planeja destronar a rainha e restaurar o catolicismo na nação britânica. Elizabeth se prepara para entrar em guerra, ao mesmo tempo em que luta contra uma paixão inesperada.
+```
+
+Como mostrado acima, o filme __Elizabeth: A Era do Ouro__ conta as dificuldades que a Rainha Elizabeth I passou enquanto estava no poder. Fazendo uma pequena relação, o grupo possui esse nome justamente pelas dificuldades (notas baixas) que enfrenta. 
+
+## Senhor dos Anéis: A Sociedade do Sucesso
+
+Agrupa os filmes que são um sucesso de bilheteria e avaliação em relação aos demais. 
+
+Provavelmente __Senhor dos Anéis__ foi o filme que trouxe a notoriedade para a atriz __Cate Blanchett__ e por isso foi escolhido para ser homenageado no nome do grupo. 
+
+## Não queria estar aqui
+
+São os filmes que possuem uma avaliação mediana mas que não conseguiram arrecadar quase nada de bilheteria.
+
+A escolha do nome para o grupo não foi para fazer uma relação sobre o assunto tratado no filme, mas simplesmente para fazer um trocadilho com a situação de bilheteria em que esse grupo se encontra: querendo estar em outro lugar.
+
+## O Hobbit
+
+Filmes totalmente relacionados com o outro grupo chamado __Senhor dos Anéis: A Sociedade do Sucesso__, que tiveram ótimas marcas de bilheteria mas as avaliações não são boas como as do grupo citado mas ainda sim são boas.
