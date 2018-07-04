@@ -1,8 +1,7 @@
-# Leia-me mucho
+# Hi!
 
-Explorando tipos de filmes com agrupamento.
+This is a hierarchical 2D clustering with Cate Blanchett's movies using R. 
 
-## Como usar
+The data was taken from [Rotten](https://rottentomatoes.com)
 
-Rode `import_data()` com o ator/atriz/diretor(a) que você quiser e isso gerará `data/movies.csv`. Depois `reports/tipos-univariados.Rmd` explora esses dados com agrupamento.
-
+To see more analysis, please check [here](https://gabrielguim.github.io/analysis.html)
